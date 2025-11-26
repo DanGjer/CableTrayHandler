@@ -18,13 +18,7 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
 
             // Initialize services
 
-            var connection = dRofusConnectionArgs.Create(
-            baseUrl: "https://api-no.drofus.com/",
-            database: "cowi-teknisk-utvikling",
-            projectId: "01",
-            username: "dbgj@cowi.com",
-            password: "Butterfly6302");
-            var client = DrofusService.CreateClient(connection);
+            var client = DrofusService.CreateClient(document);
 
             var drofusService = new DrofusService(client);
             var processor = new CableTrayRunProcessor();

@@ -11,9 +11,9 @@ namespace CableTrayHandler.Services
             _client = client;
         }
 
-        public static IdRofusClient CreateClient(dRofusConnectionArgs connection)
+        public static IdRofusClient CreateClient(Document document)
         {
-            return new dRofusClientFactory().Create(connection);
+            return new dRofusClientFactory().Create(document);
         }
 
         public List<Occurence> GetAllOccurrences(CancellationToken cancellationToken)
