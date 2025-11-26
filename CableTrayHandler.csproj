@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ExtensionId>CableTrayHandler</ExtensionId>
+    <Authors>DBGJ</Authors>
+    <Version>0.0.1</Version>
+    <Title>CableTrayHandler</Title>
+    <Description>Tool for managing cable tray runs in Revit with dRofus</Description>
+    <PackageTags>Revit;Assistant;Extension</PackageTags>
+    <PackageIcon>Icon.png</PackageIcon>
+    <PackageIconUrl></PackageIconUrl>
+    <TargetFramework>net48</TargetFramework>
+        <!-- 
+    Adjust MainRevitVersion to get IntelliSense for the correct version do a 
+    dotnet restore to restore the correct nuget packages for the selected Revit version.
+    -->
+    <MainRevitVersion Condition="'$(Configuration)' == 'Debug'">2025</MainRevitVersion>
+  </PropertyGroup>
+
+  <Import Project=".\Configurations.targets" />
+
+  <PropertyGroup>
+    <LangVersion>12</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Icon.png" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    
+    <PackageReference Include="dRofusClient.Revit.$(MainRevitVersion)" Version="*" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+  </ItemGroup>
+
+
+</Project>
