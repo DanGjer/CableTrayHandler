@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ExtensionId>CableTrayHandler</ExtensionId>
     <Authors>DBGJ</Authors>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Title>CableTrayHandler</Title>
     <Description>Tool for managing cable tray runs in Revit with dRofus</Description>
     <PackageTags>Revit;Assistant;Extension</PackageTags>

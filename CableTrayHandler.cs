@@ -43,6 +43,9 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
                 RevitCableTrays.WriteRunMetadataToRevit(document, newRuns,
                     AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
                     AssistantArgs.UserArgsRevitParameters["RevitTag"]);
+                RevitCableTrays.WriteRunMetadataToRevit(document, existingRuns,
+                    AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
+                    AssistantArgs.UserArgsRevitParameters["RevitTag"]);
             }
 
             // Generate result message
