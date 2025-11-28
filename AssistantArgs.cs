@@ -1,3 +1,4 @@
+
 namespace CableTrayHandler;
 
 public class AssistantArgs
