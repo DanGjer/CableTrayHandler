@@ -19,7 +19,8 @@ namespace CableTrayHandler
         public string AdditionalProp2 { get; set; } = "";
         public string AdditionalProp3 { get; set; } = "";
         public string AdditionalProp4 { get; set; } = "";
-        public string AdditionalStatusProp1 { get; set; } = "";
+        public string AdditionalProp5 { get; set; } = "";
+        public string AdditionalProp6 { get; set; } = "";
 
         public CableTrayRun()
         {
@@ -256,7 +257,8 @@ namespace CableTrayHandler
                             cableTrayRun.AdditionalProp2 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp2");
                             cableTrayRun.AdditionalProp3 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp3");
                             cableTrayRun.AdditionalProp4 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp4");
-                            cableTrayRun.AdditionalStatusProp1 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalStatusProp1");
+                            cableTrayRun.AdditionalProp5 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp5");
+                            cableTrayRun.AdditionalProp6 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp6");
                         }
 
                         // Set IsChecked based on the checkbox parameter
@@ -398,7 +400,8 @@ namespace CableTrayHandler
                 AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp2"],
                 AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp3"],
                 AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp4"],
-                AssistantArgs.UserArgsRevitParameters["RevitAdditionalStatusProp1"]
+                AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp5"],
+                AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp6"]
             }.Where(param => !string.IsNullOrEmpty(param)).ToArray();
 
             // If no parameters are configured, return true to allow the operation

@@ -132,25 +132,10 @@ namespace CableTrayHandler.Services
 
             // Set AdditionalProp4 if configured
             SetProperty(occurrence, "RevitAdditionalProp4", "DrofusAdditionalProp4", run.AdditionalProp4, "AdditionalProp4");
-
-            // Set AdditionalStatusProp1 if configured (special handling for status fields)
-            if (!string.IsNullOrEmpty(AssistantArgs.UserArgsRevitParameters["RevitAdditionalStatusProp1"]) &&
-                AssistantArgs.UserArgsDrofusParameters.ContainsKey("DrofusAdditionalStatusProp1") &&
-                !string.IsNullOrEmpty(AssistantArgs.UserArgsDrofusParameters["DrofusAdditionalStatusProp1"]) &&
-                !string.IsNullOrEmpty(run.AdditionalStatusProp1) && run.AdditionalStatusProp1 != "Not set")
-            {
-                try
-                {
-                    occurrence.Set(AssistantArgs.UserArgsDrofusParameters["DrofusAdditionalStatusProp1"], run.AdditionalStatusProp1);
-                }
-                catch (Exception ex)
-                {
-                    var typeHint = FieldTypeHelper.GetTypeHint(AssistantArgs.UserArgsDrofusParameters["DrofusAdditionalStatusProp1"]);
-                    var errorMsg = $"Warning: Failed to set dRofus field '{AssistantArgs.UserArgsDrofusParameters["DrofusAdditionalStatusProp1"]}' with value '{run.AdditionalStatusProp1}' from AdditionalStatusProp1. " +
-                                  $"Field expects: {typeHint}. Error: {ex.Message}";
-                    System.Diagnostics.Debug.WriteLine(errorMsg);
-                }
-            }
+            // Set AdditionalProp5 if configured
+            SetProperty(occurrence, "RevitAdditionalProp5", "DrofusAdditionalProp5", run.AdditionalProp5, "AdditionalProp5");
+            // Set AdditionalProp6 if configured
+            SetProperty(occurrence, "RevitAdditionalProp6", "DrofusAdditionalProp6", run.AdditionalProp6, "AdditionalProp6");
         }
 
         private void SetProperty(dynamic occurrence, string revitKey, string drofusKey, string value, string propertyName)
