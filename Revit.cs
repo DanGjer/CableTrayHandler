@@ -498,17 +498,17 @@ namespace CableTrayHandler
                     // Only consider merging if same width
                     if (run1Width != run2Width) continue;
 
-                    // Get all cable tray elements for each run
+                    // Get all cable tray elements and fittings for each run
                     var run1Elements = run1.ConnectedElementIds
-                        .Select(id => document.GetElement(id) as CableTray)
-                        .Where(e => e != null)
-                        .Cast<CableTray>()
+                        .Select(id => document.GetElement(id))
+                        .Where(e => e != null && (e is CableTray || 
+                            (e is FamilyInstance fi && fi.Category.Id.Value == (int)BuiltInCategory.OST_CableTrayFitting)))
                         .ToList();
 
                     var run2Elements = run2.ConnectedElementIds
-                        .Select(id => document.GetElement(id) as CableTray)
-                        .Where(e => e != null)
-                        .Cast<CableTray>()
+                        .Select(id => document.GetElement(id))
+                        .Where(e => e != null && (e is CableTray || 
+                            (e is FamilyInstance fi && fi.Category.Id.Value == (int)BuiltInCategory.OST_CableTrayFitting)))
                         .ToList();
 
                     // Check if any element from run1 is within tolerance of any element from run2
