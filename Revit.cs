@@ -194,7 +194,7 @@ namespace CableTrayHandler
                 "";  
         }
 
-        public static List<CableTrayRun> GetCableTrayRuns(Document document, CancellationToken cancellationToken)
+        public static List<CableTrayRun> GetCableTrayRuns(Document document, CancellationToken cancellationToken, bool enableProximityMerging = false)
         {
             var cableTrayRuns = new List<CableTrayRun>();
             var processedElements = new HashSet<ElementId>();
@@ -272,6 +272,12 @@ namespace CableTrayHandler
                 }
 
                 trans.Commit();
+            }
+
+            // Apply proximity-based merging if enabled
+            if (enableProximityMerging)
+            {
+                cableTrayRuns = MergeProximityRuns(cableTrayRuns, document);
             }
 
             return cableTrayRuns;
@@ -456,6 +462,122 @@ namespace CableTrayHandler
             }
 
             return true;
+        }
+
+        private static List<CableTrayRun> MergeProximityRuns(List<CableTrayRun> runs, Document document)
+        {
+            const double toleranceMm = 1.0;
+            const double toleranceFeet = toleranceMm / 304.8; // Convert mm to feet (Revit's internal unit)
+
+            var mergedRunIndices = new HashSet<int>(); // Track which runs have been merged
+            var runMerges = new Dictionary<int, int>(); // Maps old run index to new run index
+
+            // Get all cable tray elements
+            var allCableTrays = new FilteredElementCollector(document)
+                .OfCategory(BuiltInCategory.OST_CableTray)
+                .WhereElementIsNotElementType()
+                .ToElements()
+                .Cast<CableTray>()
+                .ToList();
+
+            // For each pair of runs, check if they should be merged
+            for (int i = 0; i < runs.Count; i++)
+            {
+                if (mergedRunIndices.Contains(i)) continue;
+
+                var run1 = runs[i];
+                var run1Width = run1.CableTraySize;
+
+                for (int j = i + 1; j < runs.Count; j++)
+                {
+                    if (mergedRunIndices.Contains(j)) continue;
+
+                    var run2 = runs[j];
+                    var run2Width = run2.CableTraySize;
+
+                    // Only consider merging if same width
+                    if (run1Width != run2Width) continue;
+
+                    // Get all cable tray elements for each run
+                    var run1Elements = run1.ConnectedElementIds
+                        .Select(id => document.GetElement(id) as CableTray)
+                        .Where(e => e != null)
+                        .Cast<CableTray>()
+                        .ToList();
+
+                    var run2Elements = run2.ConnectedElementIds
+                        .Select(id => document.GetElement(id) as CableTray)
+                        .Where(e => e != null)
+                        .Cast<CableTray>()
+                        .ToList();
+
+                    // Check if any element from run1 is within tolerance of any element from run2
+                    bool shouldMerge = false;
+                    foreach (var elem1 in run1Elements)
+                    {
+                        if (shouldMerge) break;
+
+                        var bbox1 = elem1.get_BoundingBox(null);
+                        if (bbox1 == null) continue;
+
+                        foreach (var elem2 in run2Elements)
+                        {
+                            var bbox2 = elem2.get_BoundingBox(null);
+                            if (bbox2 == null) continue;
+
+                            // Calculate minimum distance between bounding boxes
+                            double minDistance = CalculateMinDistanceBetweenBoundingBoxes(bbox1, bbox2);
+
+                            if (minDistance <= toleranceFeet)
+                            {
+                                shouldMerge = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // If runs should be merged, combine run2 into run1
+                    if (shouldMerge)
+                    {
+                        // Add all elements from run2 to run1
+                        foreach (var elemId in run2.ConnectedElementIds)
+                        {
+                            run1.AddElement(document.GetElement(elemId));
+                        }
+
+                        mergedRunIndices.Add(j);
+                        runMerges[j] = i;
+                    }
+                }
+            }
+
+            // Return the merged runs (exclude ones that were merged into others)
+            var result = new List<CableTrayRun>();
+            for (int i = 0; i < runs.Count; i++)
+            {
+                if (!mergedRunIndices.Contains(i))
+                {
+                    result.Add(runs[i]);
+                }
+            }
+
+            return result;
+        }
+
+        private static double CalculateMinDistanceBetweenBoundingBoxes(BoundingBoxXYZ box1, BoundingBoxXYZ box2)
+        {
+            double dx = CalculateAxisDistance(box1.Min.X, box1.Max.X, box2.Min.X, box2.Max.X);
+            double dy = CalculateAxisDistance(box1.Min.Y, box1.Max.Y, box2.Min.Y, box2.Max.Y);
+            double dz = CalculateAxisDistance(box1.Min.Z, box1.Max.Z, box2.Min.Z, box2.Max.Z);
+
+            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        private static double CalculateAxisDistance(double min1, double max1, double min2, double max2)
+        {
+            if (max1 < min2) return min2 - max1;
+            if (max2 < min1) return min1 - max2;
+            return 0; // Boxes overlap on this axis
         }
 
     }

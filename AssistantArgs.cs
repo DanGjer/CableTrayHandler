@@ -6,6 +6,9 @@ public class AssistantArgs
     [Description("Dry run"), ControlData]
     public bool UserArgsDryRun { get; set; } = false;
 
+    [Description("Enable proximity-based run merging"), ControlData(ToolTip = "Merge cable tray runs that are within 1mm of each other")]
+    public bool UserArgsEnableProximityMerging { get; set; } = false;
+
     [Description("Dictionary containing cable tray sizes"), ControlData(ToolTip = "Example: occurrence_data_23_10_06_01")]
     public Dictionary<string, string> UserArgsCableTraySizes { get; set; } = new();
 
