@@ -346,7 +346,7 @@ namespace CableTrayHandler
             }
         }
 
-        public static void WriteRunMetadataToRevit(Document doc, List<CableTrayRun> cableTrayRuns, string drofusOccIdParam, string drofusTagParam)
+        public static void WriteRunMetadataToRevit(Document doc, List<CableTrayRun> cableTrayRuns, string drofusOccIdParam, string drofusTagParam, bool writeOccurrenceId = true)
         {
             using (Transaction trans = new Transaction(doc, "Write Cable Tray Run Metadata"))
             {
@@ -359,14 +359,17 @@ namespace CableTrayHandler
                         var element = doc.GetElement(elemId);
                         if (!(element is CableTray)) continue; // Skip non-cable traystrays
 
-                        // Now safe to access cable tray parameters
-                        var drofusOccIdElem = element.LookupParameter(drofusOccIdParam);
-                        if (drofusOccIdElem != null)
+                        // Write DrofusOccId (only for new runs)
+                        if (writeOccurrenceId)
                         {
-                            if (drofusOccIdElem.StorageType == StorageType.Integer)
-                                drofusOccIdElem.Set(run.DrofusOccId);
-                            else if (drofusOccIdElem.StorageType == StorageType.String)
-                                drofusOccIdElem.Set(run.DrofusOccId.ToString());
+                            var drofusOccIdElem = element.LookupParameter(drofusOccIdParam);
+                            if (drofusOccIdElem != null)
+                            {
+                                if (drofusOccIdElem.StorageType == StorageType.Integer)
+                                    drofusOccIdElem.Set(run.DrofusOccId);
+                                else if (drofusOccIdElem.StorageType == StorageType.String)
+                                    drofusOccIdElem.Set(run.DrofusOccId.ToString());
+                            }
                         }
 
                         // Write DrofusTag (as string)

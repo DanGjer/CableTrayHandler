@@ -45,12 +45,17 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
             // Write metadata back to Revit (if not dry run)
             if (!args.UserArgsDryRun)
             {
+                // Write both ID and tag for new runs
                 RevitCableTrays.WriteRunMetadataToRevit(document, newRuns,
                     AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
-                    AssistantArgs.UserArgsRevitParameters["RevitTag"]);
+                    AssistantArgs.UserArgsRevitParameters["RevitTag"],
+                    writeOccurrenceId: true);
+                
+                // Only write tag for existing runs (they already have the ID)
                 RevitCableTrays.WriteRunMetadataToRevit(document, existingRuns,
                     AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
-                    AssistantArgs.UserArgsRevitParameters["RevitTag"]);
+                    AssistantArgs.UserArgsRevitParameters["RevitTag"],
+                    writeOccurrenceId: false);
             }
 
             // Generate result message

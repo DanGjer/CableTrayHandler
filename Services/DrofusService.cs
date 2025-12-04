@@ -82,8 +82,9 @@ namespace CableTrayHandler.Services
                         if (!isDryRun)
                         {
                             _client.UpdateOccurrence(existingOccurrenceRead);
-                            // Read back the tag from dRofus after update
-                            run.DrofusTag = existingOccurrenceRead.ClassificationNumber ?? run.DrofusTag;
+                            // Query again to get the latest tag from dRofus after update
+                            var updatedOccurrenceRead = _client.GetOccurrence(run.DrofusOccId, queryExistingOccurrence);
+                            run.DrofusTag = updatedOccurrenceRead?.ClassificationNumber ?? run.DrofusTag;
                         }
                         
                         updatedCount++;
