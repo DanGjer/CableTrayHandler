@@ -278,6 +278,23 @@ namespace CableTrayHandler
             if (enableProximityMerging)
             {
                 cableTrayRuns = MergeProximityRuns(cableTrayRuns, document);
+                
+                // Update GUIDs for merged runs - all elements in a merged run get the same GUID
+                using (Transaction trans = new Transaction(document, "Update Run GUIDs after merging"))
+                {
+                    trans.Start();
+                    
+                    foreach (var run in cableTrayRuns)
+                    {
+                        foreach (var elemId in run.ConnectedElementIds)
+                        {
+                            var element = document.GetElement(elemId);
+                            element?.LookupParameter(RUN_ID_PARAM)?.Set(run.RunId);
+                        }
+                    }
+                    
+                    trans.Commit();
+                }
             }
 
             return cableTrayRuns;
