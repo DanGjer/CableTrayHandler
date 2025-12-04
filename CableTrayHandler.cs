@@ -39,6 +39,12 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
             RevitCableTrays.AssignDrofusItemIds(newRuns, args.UserArgsCableTraySizes);
             var cableTrayRunsWithNoId = processor.GetRunsWithoutItemIds(newRuns);
 
+            int createdCount = 0;
+            int updatedCount = 0;
+
+            // NOTE: dRofus sync is disabled for V2 branch (testing run identification only)
+            // Uncomment below to re-enable dRofus processing
+            /*
             // Process runs in dRofus
             var (createdCount, updatedCount) = drofusService.ProcessCableTrayRuns(newRuns, existingRuns, document, args.UserArgsDryRun);
 
@@ -57,6 +63,7 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
                     AssistantArgs.UserArgsRevitParameters["RevitTag"],
                     writeOccurrenceId: false);
             }
+            */
 
             // Generate result message
             var resultMessage = processor.GenerateResultMessage(existingCount, createdCount, updatedCount, cableTrayRunsWithNoId.Count, args.UserArgsDryRun, totalRunsFound, skippedUnchecked);
