@@ -13,6 +13,11 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
             if (document is null)
                 return Result.Text.Failed("Revit has no active model open");
 
+            // Validate essential parameters are configured
+            var validationResult = ValidateEssentialParameters();
+            if (validationResult != null)
+                return validationResult;
+
             if (!RevitCableTrays.ParameterChecker(document))
                 return Result.Text.Failed("Required parameters are not present in the current model");
 
@@ -63,5 +68,38 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
         {
             return Result.Text.Failed($"An error occurred: {ex.Message}");
         }
+    }
+
+    private static IExtensionResult? ValidateEssentialParameters()
+    {
+        var missingParameters = new List<string>();
+
+        // Check Revit parameters
+        if (string.IsNullOrWhiteSpace(AssistantArgs.UserArgsRevitParameters["RevitTag"]))
+            missingParameters.Add("RevitTag");
+
+        if (string.IsNullOrWhiteSpace(AssistantArgs.UserArgsRevitParameters["RevitDrofusId"]))
+            missingParameters.Add("RevitDrofusId");
+
+        if (string.IsNullOrWhiteSpace(AssistantArgs.UserArgsRevitParameters["RevitRunGuid"]))
+            missingParameters.Add("RevitRunGuid");
+
+        if (string.IsNullOrWhiteSpace(AssistantArgs.UserArgsRevitParameters["RevitCheckbox"]))
+            missingParameters.Add("RevitCheckbox");
+
+        // Check dRofus parameters
+        if (string.IsNullOrWhiteSpace(AssistantArgs.UserArgsDrofusParameters["DrofusModelName"]))
+            missingParameters.Add("DrofusModelName");
+
+        if (string.IsNullOrWhiteSpace(AssistantArgs.UserArgsDrofusParameters["DrofusLengthDouble"]))
+            missingParameters.Add("DrofusLengthDouble");
+
+        if (missingParameters.Count > 0)
+        {
+            var parameterList = string.Join(", ", missingParameters);
+            return Result.Text.Failed($"The following essential parameters must be configured: {parameterList}");
+        }
+
+        return null;
     }
 }

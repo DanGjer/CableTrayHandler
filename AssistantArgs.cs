@@ -1,3 +1,4 @@
+
 namespace CableTrayHandler;
 
 public class AssistantArgs
@@ -19,7 +20,8 @@ public class AssistantArgs
         { "RevitAdditionalProp2", "" },
         { "RevitAdditionalProp3", "" },
         { "RevitAdditionalProp4", "" },
-        { "RevitAdditionalStatusProp1", "" }
+        { "RevitAdditionalProp5", "" },
+        { "RevitAdditionalProp6", "" }
 
     };
 
@@ -32,6 +34,7 @@ public class AssistantArgs
         { "DrofusAdditionalProp2", "" },
         { "DrofusAdditionalProp3", "" },
         { "DrofusAdditionalProp4", "" },
-        { "DrofusAdditionalStatusProp1", "" },
+        { "DrofusAdditionalProp5", "" },
+        { "DrofusAdditionalProp6", "" }
     };
 }
