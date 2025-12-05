@@ -571,6 +571,26 @@ namespace CableTrayHandler
                             // Calculate minimum distance between bounding boxes
                             double minDistance = CalculateMinDistanceBetweenBoundingBoxes(bbox1, bbox2);
 
+                            // Debug: Log distance calculation for the three target runs
+                            if ((run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 8990992 ||
+                                 run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586413 ||
+                                 run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586699) &&
+                                (run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 8990992 ||
+                                 run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586413 ||
+                                 run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586699))
+                            {
+                                var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CableTrayConnections.txt");
+                                File.AppendAllLines(logPath, new[]
+                                {
+                                    $"Distance between runs: {minDistance} feet ({minDistance * 304.8} mm)",
+                                    $"Tolerance: {toleranceFeet} feet ({toleranceMm} mm)",
+                                    $"Should merge: {minDistance <= toleranceFeet}",
+                                    $"Run1 first element: {run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue}",
+                                    $"Run2 first element: {run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue}",
+                                    ""
+                                });
+                            }
+
                             if (minDistance <= toleranceFeet)
                             {
                                 shouldMerge = true;
