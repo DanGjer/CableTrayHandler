@@ -29,7 +29,7 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
             var processor = new CableTrayRunProcessor();
 
             // Get data
-            var cableTrayRuns = RevitCableTrays.GetCableTrayRuns(document, cancellationToken, args.UserArgsEnableProximityMerging);
+            var cableTrayRuns = RevitCableTrays.GetCableTrayRuns(document, cancellationToken, args.UserArgsEnableProximityMerging, args.UserArgsTolerance);
             var existingDrofusIds = drofusService.GetExistingDrofusIds(cancellationToken);
 
             // Process cable tray runs

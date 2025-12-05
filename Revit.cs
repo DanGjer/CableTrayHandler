@@ -194,7 +194,7 @@ namespace CableTrayHandler
                 "";  
         }
 
-        public static List<CableTrayRun> GetCableTrayRuns(Document document, CancellationToken cancellationToken, bool enableProximityMerging = false)
+        public static List<CableTrayRun> GetCableTrayRuns(Document document, CancellationToken cancellationToken, bool enableProximityMerging = false, double toleranceMm = 1.0)
         {
             var cableTrayRuns = new List<CableTrayRun>();
             var processedElements = new HashSet<ElementId>();
@@ -277,7 +277,7 @@ namespace CableTrayHandler
             // Apply proximity-based merging if enabled
             if (enableProximityMerging)
             {
-                cableTrayRuns = MergeProximityRuns(cableTrayRuns, document);
+                cableTrayRuns = MergeProximityRuns(cableTrayRuns, document, toleranceMm);
                 
                 // Update GUIDs for merged runs - all elements in a merged run get the same GUID
                 using (Transaction trans = new Transaction(document, "Update Run GUIDs after merging"))
@@ -481,10 +481,9 @@ namespace CableTrayHandler
             return true;
         }
 
-        private static List<CableTrayRun> MergeProximityRuns(List<CableTrayRun> runs, Document document)
+        private static List<CableTrayRun> MergeProximityRuns(List<CableTrayRun> runs, Document document, double toleranceMm)
         {
-            const double toleranceMm = 1.0;
-            const double toleranceFeet = toleranceMm / 304.8; // Convert mm to feet (Revit's internal unit)
+            double toleranceFeet = toleranceMm / 304.8; // Convert mm to feet (Revit's internal unit)
 
             var mergedRunIndices = new HashSet<int>(); // Track which runs have been merged
             var runMerges = new Dictionary<int, int>(); // Maps old run index to new run index
