@@ -228,10 +228,8 @@ namespace CableTrayHandler
                         // Get properties from first cable tray in the run
                         if (elem is CableTray firstCableTray)
                         {
-                            var widthParam = firstCableTray.get_Parameter(BuiltInParameter.RBS_CABLETRAY_WIDTH_PARAM);
-                            cableTrayRun.CableTraySize = widthParam != null ?
-                                UnitUtils.ConvertFromInternalUnits(widthParam.AsDouble(), UnitTypeId.Millimeters).ToString("0.##") :
-                                "0.0";
+                            // Use normalized size (max of width/height) to handle cable channels with swapped parameters
+                            cableTrayRun.CableTraySize = GetNormalizedCableTraySize(firstCableTray);
 
                             // Add dRofus properties using majority values from all elements in the run
                             var tagValues = cableTrayRun.ConnectedElementIds
@@ -511,7 +509,7 @@ namespace CableTrayHandler
                     var run2 = runs[j];
                     var run2Width = run2.CableTraySize;
 
-                    // Only consider merging if same width
+                    // Only consider merging if same normalized size (handles cable channels with swapped width/height)
                     if (run1Width != run2Width) continue;
 
                     // Get all cable tray elements and fittings for each run
@@ -594,6 +592,29 @@ namespace CableTrayHandler
             if (max1 < min2) return min2 - max1;
             if (max2 < min1) return min1 - max2;
             return 0; // Boxes overlap on this axis
+        }
+
+        private static string GetNormalizedCableTraySize(CableTray cableTray)
+        {
+            try
+            {
+                var widthParam = cableTray.get_Parameter(BuiltInParameter.RBS_CABLETRAY_WIDTH_PARAM);
+                var heightParam = cableTray.get_Parameter(BuiltInParameter.RBS_CABLETRAY_HEIGHT_PARAM);
+
+                double width = widthParam?.AsDouble() ?? 0;
+                double height = heightParam?.AsDouble() ?? 0;
+
+                // Use the larger dimension to handle cases where width/height are swapped
+                double largerDimension = Math.Max(width, height);
+
+                return largerDimension > 0 ?
+                    UnitUtils.ConvertFromInternalUnits(largerDimension, UnitTypeId.Millimeters).ToString("0.##") :
+                    "0.0";
+            }
+            catch
+            {
+                return "0.0";
+            }
         }
 
     }
