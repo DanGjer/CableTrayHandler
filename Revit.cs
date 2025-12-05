@@ -328,6 +328,35 @@ namespace CableTrayHandler
 
             if (elementConnectors == null) return;
 
+            // Debug logging for specific elements
+            var targetElementIds = new[] { 8990992, 5586413, 5586699 };
+            if (targetElementIds.Contains(element.Id.IntegerValue))
+            {
+                var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CableTrayConnections.txt");
+                var logLines = new List<string>
+                {
+                    $"\n=== Element {element.Id.IntegerValue} ===",
+                    $"Type: {element.GetType().Name}",
+                    $"Category: {element.Category?.Name ?? "Unknown"}",
+                    $"Connector count: {elementConnectors.Count}"
+                };
+
+                foreach (Connector conn in elementConnectors)
+                {
+                    logLines.Add($"  Connector: {conn.Origin.X:F2}, {conn.Origin.Y:F2}, {conn.Origin.Z:F2}");
+                    foreach (Connector ref_conn in conn.AllRefs)
+                    {
+                        var connected = ref_conn.Owner;
+                        if (connected != null && connected.Id != element.Id)
+                        {
+                            logLines.Add($"    -> Connected to Element {connected.Id.IntegerValue} ({connected.GetType().Name}, {connected.Category?.Name ?? "Unknown"})");
+                        }
+                    }
+                }
+
+                File.AppendAllLines(logPath, logLines);
+            }
+
             foreach (Connector conn in elementConnectors)
             {
                 foreach (Connector ref_conn in conn.AllRefs)
