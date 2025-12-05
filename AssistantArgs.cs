@@ -9,8 +9,8 @@ public class AssistantArgs
     [Description("Enable proximity-based run merging"), ControlData(ToolTip = "Merge cable tray runs that are within 1mm of each other")]
     public bool UserArgsEnableProximityMerging { get; set; } = false;
 
-    [Description("Tolerance"), ControlData(ToolTip = "Tolerance value in millimeters for proximity-based merging")]
-    public double UserArgsTolerance { get; set; } = 1.0;
+    [Description("Tolerance"), ControlData(ToolTip = "Tolerance value in millimeters for proximity-based merging (0.0 = touching only)")]
+    public double UserArgsTolerance { get; set; } = 0.0;
 
     [Description("Dictionary containing cable tray sizes"), ControlData(ToolTip = "Example: occurrence_data_23_10_06_01")]
     public Dictionary<string, string> UserArgsCableTraySizes { get; set; } = new();

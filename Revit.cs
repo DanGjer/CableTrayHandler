@@ -194,7 +194,7 @@ namespace CableTrayHandler
                 "";  
         }
 
-        public static List<CableTrayRun> GetCableTrayRuns(Document document, CancellationToken cancellationToken, bool enableProximityMerging = false, double toleranceMm = 1.0)
+        public static List<CableTrayRun> GetCableTrayRuns(Document document, CancellationToken cancellationToken, bool enableProximityMerging = false, double toleranceMm = 0.0)
         {
             var cableTrayRuns = new List<CableTrayRun>();
             var processedElements = new HashSet<ElementId>();
