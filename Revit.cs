@@ -416,7 +416,7 @@ namespace CableTrayHandler
                     foreach (var elemId in run.ConnectedElementIds)
                     {
                         var element = doc.GetElement(elemId);
-                        if (!(element is CableTray)) continue; // Skip non-cable traystrays
+                        if (element == null) continue;
 
                         // Write DrofusOccId (only for new runs)
                         if (writeOccurrenceId)
