@@ -9,6 +9,9 @@ public class AssistantArgs
     [Description("Enable proximity-based run merging"), ControlData(ToolTip = "Merge cable tray runs that are within 1mm of each other")]
     public bool UserArgsEnableProximityMerging { get; set; } = false;
 
+    [Description("Import to dRofus"), ControlData(ToolTip = "Enable importing data to dRofus")]
+    public bool UserArgsEnableImportToDrofus { get; set; } = false;
+
     [Description("Tolerance"), ControlData(ToolTip = "Tolerance value in millimeters for proximity-based merging (0.0 = touching only)")]
     public double UserArgsTolerance { get; set; } = 0.0;
 

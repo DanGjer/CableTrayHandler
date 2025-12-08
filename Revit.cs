@@ -4,7 +4,7 @@ namespace CableTrayHandler
 {
     public class CableTrayRun
     {
-        public string RunId { get; private set; }
+        public string RunId { get; set; }
         public List<ElementId> ConnectedElementIds { get; private set; }
         public string CableTraySize { get; set; }
         public double TotalLengthMeters { get; private set; }  // Changed property name to be explicit
@@ -208,6 +208,34 @@ namespace CableTrayHandler
                     .WhereElementIsNotElementType()
                     .ToElements();
 
+                // STEP 1: Pre-group elements by existing GUIDs (user overrides from previous runs)
+                var preGroupedRuns = new Dictionary<string, CableTrayRun>();
+                foreach (Element elem in allCableTrays)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    var existingGuid = elem.LookupParameter(RUN_ID_PARAM)?.AsString();
+                    
+                    if (!string.IsNullOrEmpty(existingGuid))
+                    {
+                        // Element has a user-assigned or previous GUID - respect it
+                        if (!preGroupedRuns.ContainsKey(existingGuid))
+                        {
+                            preGroupedRuns[existingGuid] = new CableTrayRun { RunId = existingGuid };
+                        }
+                        
+                        preGroupedRuns[existingGuid].AddElement(elem);
+                        processedElements.Add(elem.Id);
+                    }
+                }
+
+                // Add pre-grouped runs to results
+                foreach (var run in preGroupedRuns.Values)
+                {
+                    cableTrayRuns.Add(run);
+                }
+
+                // STEP 2: Connector-based tracing for remaining elements (not yet assigned a GUID)
                 foreach (Element elem in allCableTrays)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -218,61 +246,71 @@ namespace CableTrayHandler
 
                     if (cableTrayRun.ElementCount > 0)
                     {
-                        // Write the GUID to each element in the run
-                        foreach (ElementId id in cableTrayRun.ConnectedElementIds)
-                        {
-                            Element element = document.GetElement(id);
-                            element.LookupParameter(RUN_ID_PARAM)?.Set(cableTrayRun.RunId);
-                        }
-
-                        // Get properties from first cable tray in the run
-                        if (elem is CableTray firstCableTray)
-                        {
-                            // Use normalized size (max of width/height) to handle cable channels with swapped parameters
-                            cableTrayRun.CableTraySize = GetNormalizedCableTraySize(firstCableTray);
-
-                            // Add dRofus properties using majority values from all elements in the run
-                            var tagValues = cableTrayRun.ConnectedElementIds
-                                .Select(id => document.GetElement(id)?.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitTag"])?.AsString())
-                                .Where(val => !string.IsNullOrEmpty(val))
-                                .Cast<string>()
-                                .ToList();
-                            cableTrayRun.DrofusTag = tagValues.Any() ? 
-                                tagValues.GroupBy(x => x).OrderByDescending(g => g.Count()).First().Key : 
-                                "No tag";
-
-                            var idValues = cableTrayRun.ConnectedElementIds
-                                .Select(id => document.GetElement(id)?.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitDrofusId"])?.AsInteger())
-                                .Where(val => val.HasValue && val.Value != 0)
-                                .Select(val => val!.Value)
-                                .ToList();
-                            cableTrayRun.DrofusOccId = idValues.Any() ? 
-                                idValues.GroupBy(x => x).OrderByDescending(g => g.Count()).First().Key : 
-                                0;
-
-                            // Extract additional properties using majority values
-                            cableTrayRun.AdditionalProp1 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp1");
-                            cableTrayRun.AdditionalProp2 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp2");
-                            cableTrayRun.AdditionalProp3 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp3");
-                            cableTrayRun.AdditionalProp4 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp4");
-                            cableTrayRun.AdditionalProp5 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp5");
-                            cableTrayRun.AdditionalProp6 = GetMajorityParameterValue(cableTrayRun.ConnectedElementIds, document, "RevitAdditionalProp6");
-                        }
-
-                        // Set IsChecked based on the checkbox parameter
-                        cableTrayRun.IsChecked = cableTrayRun.ConnectedElementIds
-                            .Select(id => document.GetElement(id))
-                            .Any(element =>
-                                element.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitCheckbox"])?.AsInteger() == 1);
-
                         cableTrayRuns.Add(cableTrayRun);
                     }
+                }
+
+                // STEP 3: Write the GUID to each element in all runs
+                foreach (var run in cableTrayRuns)
+                {
+                    foreach (ElementId id in run.ConnectedElementIds)
+                    {
+                        Element element = document.GetElement(id);
+                        element.LookupParameter(RUN_ID_PARAM)?.Set(run.RunId);
+                    }
+                }
+
+                // STEP 4: Get properties from first cable tray in each run
+                foreach (var run in cableTrayRuns)
+                {
+                    var firstCableTray = run.ConnectedElementIds
+                        .Select(id => document.GetElement(id) as CableTray)
+                        .FirstOrDefault(ct => ct != null);
+
+                    if (firstCableTray != null)
+                    {
+                        // Use normalized size (max of width/height) to handle cable channels with swapped parameters
+                        run.CableTraySize = GetNormalizedCableTraySize(firstCableTray);
+
+                        // Add dRofus properties using majority values from all elements in the run
+                        var tagValues = run.ConnectedElementIds
+                            .Select(id => document.GetElement(id)?.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitTag"])?.AsString())
+                            .Where(val => !string.IsNullOrEmpty(val))
+                            .Cast<string>()
+                            .ToList();
+                        run.DrofusTag = tagValues.Any() ? 
+                            tagValues.GroupBy(x => x).OrderByDescending(g => g.Count()).First().Key : 
+                            "No tag";
+
+                        var idValues = run.ConnectedElementIds
+                            .Select(id => document.GetElement(id)?.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitDrofusId"])?.AsInteger())
+                            .Where(val => val.HasValue && val.Value != 0)
+                            .Select(val => val!.Value)
+                            .ToList();
+                        run.DrofusOccId = idValues.Any() ? 
+                            idValues.GroupBy(x => x).OrderByDescending(g => g.Count()).First().Key : 
+                            0;
+
+                        // Extract additional properties using majority values
+                        run.AdditionalProp1 = GetMajorityParameterValue(run.ConnectedElementIds, document, "RevitAdditionalProp1");
+                        run.AdditionalProp2 = GetMajorityParameterValue(run.ConnectedElementIds, document, "RevitAdditionalProp2");
+                        run.AdditionalProp3 = GetMajorityParameterValue(run.ConnectedElementIds, document, "RevitAdditionalProp3");
+                        run.AdditionalProp4 = GetMajorityParameterValue(run.ConnectedElementIds, document, "RevitAdditionalProp4");
+                        run.AdditionalProp5 = GetMajorityParameterValue(run.ConnectedElementIds, document, "RevitAdditionalProp5");
+                        run.AdditionalProp6 = GetMajorityParameterValue(run.ConnectedElementIds, document, "RevitAdditionalProp6");
+                    }
+
+                    // Set IsChecked based on the checkbox parameter
+                    run.IsChecked = run.ConnectedElementIds
+                        .Select(id => document.GetElement(id))
+                        .Any(element =>
+                            element.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitCheckbox"])?.AsInteger() == 1);
                 }
 
                 trans.Commit();
             }
 
-            // Apply proximity-based merging if enabled
+            // STEP 5: Apply proximity-based merging if enabled
             if (enableProximityMerging)
             {
                 cableTrayRuns = MergeProximityRuns(cableTrayRuns, document, toleranceMm);
@@ -327,35 +365,6 @@ namespace CableTrayHandler
             }
 
             if (elementConnectors == null) return;
-
-            // Debug logging for specific elements
-            var targetElementIds = new[] { 8990992, 5586413, 5586699 };
-            if (targetElementIds.Contains(element.Id.IntegerValue))
-            {
-                var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CableTrayConnections.txt");
-                var logLines = new List<string>
-                {
-                    $"\n=== Element {element.Id.IntegerValue} ===",
-                    $"Type: {element.GetType().Name}",
-                    $"Category: {element.Category?.Name ?? "Unknown"}",
-                    $"Connector count: {elementConnectors.Count}"
-                };
-
-                foreach (Connector conn in elementConnectors)
-                {
-                    logLines.Add($"  Connector: {conn.Origin.X:F2}, {conn.Origin.Y:F2}, {conn.Origin.Z:F2}");
-                    foreach (Connector ref_conn in conn.AllRefs)
-                    {
-                        var connected = ref_conn.Owner;
-                        if (connected != null && connected.Id != element.Id)
-                        {
-                            logLines.Add($"    -> Connected to Element {connected.Id.IntegerValue} ({connected.GetType().Name}, {connected.Category?.Name ?? "Unknown"})");
-                        }
-                    }
-                }
-
-                File.AppendAllLines(logPath, logLines);
-            }
 
             foreach (Connector conn in elementConnectors)
             {
@@ -515,14 +524,6 @@ namespace CableTrayHandler
             var mergedRunIndices = new HashSet<int>(); // Track which runs have been merged
             var runMerges = new Dictionary<int, int>(); // Maps old run index to new run index
 
-            // Get all cable tray elements
-            var allCableTrays = new FilteredElementCollector(document)
-                .OfCategory(BuiltInCategory.OST_CableTray)
-                .WhereElementIsNotElementType()
-                .ToElements()
-                .Cast<CableTray>()
-                .ToList();
-
             // For each pair of runs, check if they should be merged
             for (int i = 0; i < runs.Count; i++)
             {
@@ -538,58 +539,38 @@ namespace CableTrayHandler
                     var run2 = runs[j];
                     var run2Width = run2.CableTraySize;
 
-                    // Only consider merging if same normalized size (handles cable channels with swapped width/height)
+                    // Only consider merging if same normalized size
                     if (run1Width != run2Width) continue;
 
-                    // Get all cable tray elements and fittings for each run
+                    // Get all cable tray elements (not fittings) for each run
                     var run1Elements = run1.ConnectedElementIds
                         .Select(id => document.GetElement(id))
-                        .Where(e => e != null && (e is CableTray || 
-                            (e is FamilyInstance fi && fi.Category.Id.Value == (int)BuiltInCategory.OST_CableTrayFitting)))
+                        .Where(e => e != null && e is CableTray)
+                        .Cast<CableTray>()
                         .ToList();
 
                     var run2Elements = run2.ConnectedElementIds
                         .Select(id => document.GetElement(id))
-                        .Where(e => e != null && (e is CableTray || 
-                            (e is FamilyInstance fi && fi.Category.Id.Value == (int)BuiltInCategory.OST_CableTrayFitting)))
+                        .Where(e => e != null && e is CableTray)
+                        .Cast<CableTray>()
                         .ToList();
 
-                    // Check if any element from run1 is within tolerance of any element from run2
+                    // Check if any cable tray from run1 is within tolerance of any cable tray from run2
                     bool shouldMerge = false;
-                    foreach (var elem1 in run1Elements)
+                    foreach (var tray1 in run1Elements)
                     {
                         if (shouldMerge) break;
 
-                        var bbox1 = elem1.get_BoundingBox(null);
-                        if (bbox1 == null) continue;
+                        var curve1 = (tray1.Location as LocationCurve)?.Curve;
+                        if (curve1 == null) continue;
 
-                        foreach (var elem2 in run2Elements)
+                        foreach (var tray2 in run2Elements)
                         {
-                            var bbox2 = elem2.get_BoundingBox(null);
-                            if (bbox2 == null) continue;
+                            var curve2 = (tray2.Location as LocationCurve)?.Curve;
+                            if (curve2 == null) continue;
 
-                            // Calculate minimum distance between bounding boxes
-                            double minDistance = CalculateMinDistanceBetweenBoundingBoxes(bbox1, bbox2);
-
-                            // Debug: Log distance calculation for the three target runs
-                            if ((run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 8990992 ||
-                                 run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586413 ||
-                                 run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586699) &&
-                                (run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 8990992 ||
-                                 run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586413 ||
-                                 run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue == 5586699))
-                            {
-                                var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CableTrayConnections.txt");
-                                File.AppendAllLines(logPath, new[]
-                                {
-                                    $"Distance between runs: {minDistance} feet ({minDistance * 304.8} mm)",
-                                    $"Tolerance: {toleranceFeet} feet ({toleranceMm} mm)",
-                                    $"Should merge: {minDistance <= toleranceFeet}",
-                                    $"Run1 first element: {run1.ConnectedElementIds.FirstOrDefault()?.IntegerValue}",
-                                    $"Run2 first element: {run2.ConnectedElementIds.FirstOrDefault()?.IntegerValue}",
-                                    ""
-                                });
-                            }
+                            // Calculate minimum distance between the two curves' endpoints
+                            double minDistance = CalculateMinDistanceBetweenCurves(curve1, curve2);
 
                             if (minDistance <= toleranceFeet)
                             {
@@ -627,20 +608,34 @@ namespace CableTrayHandler
             return result;
         }
 
-        private static double CalculateMinDistanceBetweenBoundingBoxes(BoundingBoxXYZ box1, BoundingBoxXYZ box2)
+        private static double CalculateMinDistanceBetweenCurves(Curve curve1, Curve curve2)
         {
-            double dx = CalculateAxisDistance(box1.Min.X, box1.Max.X, box2.Min.X, box2.Max.X);
-            double dy = CalculateAxisDistance(box1.Min.Y, box1.Max.Y, box2.Min.Y, box2.Max.Y);
-            double dz = CalculateAxisDistance(box1.Min.Z, box1.Max.Z, box2.Min.Z, box2.Max.Z);
+            // Get all endpoints
+            var p1Start = curve1.GetEndPoint(0);
+            var p1End = curve1.GetEndPoint(1);
+            var p2Start = curve2.GetEndPoint(0);
+            var p2End = curve2.GetEndPoint(1);
 
-            return Math.Sqrt(dx * dx + dy * dy + dz * dz);
-        }
+            // Calculate all possible distances between endpoints
+            double d1 = p1Start.DistanceTo(p2Start);
+            double d2 = p1Start.DistanceTo(p2End);
+            double d3 = p1End.DistanceTo(p2Start);
+            double d4 = p1End.DistanceTo(p2End);
 
-        private static double CalculateAxisDistance(double min1, double max1, double min2, double max2)
-        {
-            if (max1 < min2) return min2 - max1;
-            if (max2 < min1) return min1 - max2;
-            return 0; // Boxes overlap on this axis
+            // Also check if either curve's endpoints are close to the other curve itself
+            // This handles T-junctions and L-shapes where an endpoint meets the middle of another curve
+            IntersectionResult result1 = curve2.Project(p1Start);
+            IntersectionResult result2 = curve2.Project(p1End);
+            IntersectionResult result3 = curve1.Project(p2Start);
+            IntersectionResult result4 = curve1.Project(p2End);
+
+            double d5 = result1?.Distance ?? double.MaxValue;
+            double d6 = result2?.Distance ?? double.MaxValue;
+            double d7 = result3?.Distance ?? double.MaxValue;
+            double d8 = result4?.Distance ?? double.MaxValue;
+
+            // Return the minimum of all distances
+            return new[] { d1, d2, d3, d4, d5, d6, d7, d8 }.Min();
         }
 
         private static string GetNormalizedCableTraySize(CableTray cableTray)

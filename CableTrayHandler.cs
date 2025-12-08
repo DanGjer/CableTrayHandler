@@ -42,28 +42,27 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
             int createdCount = 0;
             int updatedCount = 0;
 
-            // NOTE: dRofus sync is disabled for V2 branch (testing run identification only)
-            // Uncomment below to re-enable dRofus processing
-            /*
-            // Process runs in dRofus
-            var (createdCount, updatedCount) = drofusService.ProcessCableTrayRuns(newRuns, existingRuns, document, args.UserArgsDryRun);
-
-            // Write metadata back to Revit (if not dry run)
-            if (!args.UserArgsDryRun)
+            // Process runs in dRofus only if enabled
+            if (args.UserArgsEnableImportToDrofus)
             {
-                // Write both ID and tag for new runs
-                RevitCableTrays.WriteRunMetadataToRevit(document, newRuns,
-                    AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
-                    AssistantArgs.UserArgsRevitParameters["RevitTag"],
-                    writeOccurrenceId: true);
-                
-                // Only write tag for existing runs (they already have the ID)
-                RevitCableTrays.WriteRunMetadataToRevit(document, existingRuns,
-                    AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
-                    AssistantArgs.UserArgsRevitParameters["RevitTag"],
-                    writeOccurrenceId: false);
+                (createdCount, updatedCount) = drofusService.ProcessCableTrayRuns(newRuns, existingRuns, document, args.UserArgsDryRun);
+
+                // Write metadata back to Revit (if not dry run)
+                if (!args.UserArgsDryRun)
+                {
+                    // Write both ID and tag for new runs
+                    RevitCableTrays.WriteRunMetadataToRevit(document, newRuns,
+                        AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
+                        AssistantArgs.UserArgsRevitParameters["RevitTag"],
+                        writeOccurrenceId: true);
+                    
+                    // Only write tag for existing runs (they already have the ID)
+                    RevitCableTrays.WriteRunMetadataToRevit(document, existingRuns,
+                        AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
+                        AssistantArgs.UserArgsRevitParameters["RevitTag"],
+                        writeOccurrenceId: false);
+                }
             }
-            */
 
             // Generate result message
             var resultMessage = processor.GenerateResultMessage(existingCount, createdCount, updatedCount, cableTrayRunsWithNoId.Count, args.UserArgsDryRun, totalRunsFound, skippedUnchecked);
