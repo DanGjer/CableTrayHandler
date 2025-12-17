@@ -51,7 +51,14 @@ namespace CableTrayHandler.Services
                         var createdOccurrenceRead = _client.GetOccurrence(createdOccurrence.Id ?? 0, queryOccurrence);
                         
                         run.DrofusOccId = createdOccurrenceRead.Id ?? 0;
-                        run.DrofusTag = createdOccurrenceRead.ClassificationNumber ?? "";
+                        run.DrofusTag = createdOccurrenceRead.ClassificationNumber ?? "No tag in dRofus";
+                        
+                        // Debug: Check if tag is actually "No tag" (may indicate dRofus didn't auto-generate one)
+                        if (run.DrofusTag == "No tag" || string.IsNullOrWhiteSpace(run.DrofusTag))
+                        {
+                            // Tag wasn't generated; try querying other fields or wait for dRofus to populate it
+                            System.Diagnostics.Debug.WriteLine($"WARNING: New occurrence {run.DrofusOccId} has no tag from dRofus");
+                        }
                     }
                     else
                     {

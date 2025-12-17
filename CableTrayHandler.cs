@@ -56,11 +56,11 @@ public class CableTrayHandlerCommand : IRevitExtension<AssistantArgs>
                         AssistantArgs.UserArgsRevitParameters["RevitTag"],
                         writeOccurrenceId: true);
                     
-                    // Only write tag for existing runs (they already have the ID)
+                    // Write ID and tag for existing runs too, so newly-added elements inherit the occurrence ID
                     RevitCableTrays.WriteRunMetadataToRevit(document, existingRuns,
                         AssistantArgs.UserArgsRevitParameters["RevitDrofusId"],
                         AssistantArgs.UserArgsRevitParameters["RevitTag"],
-                        writeOccurrenceId: false);
+                        writeOccurrenceId: true);
                 }
             }
 

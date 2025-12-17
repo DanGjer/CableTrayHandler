@@ -208,34 +208,7 @@ namespace CableTrayHandler
                     .WhereElementIsNotElementType()
                     .ToElements();
 
-                // STEP 1: Pre-group elements by existing GUIDs (user overrides from previous runs)
-                var preGroupedRuns = new Dictionary<string, CableTrayRun>();
-                foreach (Element elem in allCableTrays)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    var existingGuid = elem.LookupParameter(RUN_ID_PARAM)?.AsString();
-                    
-                    if (!string.IsNullOrEmpty(existingGuid))
-                    {
-                        // Element has a user-assigned or previous GUID - respect it
-                        if (!preGroupedRuns.ContainsKey(existingGuid))
-                        {
-                            preGroupedRuns[existingGuid] = new CableTrayRun { RunId = existingGuid };
-                        }
-                        
-                        preGroupedRuns[existingGuid].AddElement(elem);
-                        processedElements.Add(elem.Id);
-                    }
-                }
-
-                // Add pre-grouped runs to results
-                foreach (var run in preGroupedRuns.Values)
-                {
-                    cableTrayRuns.Add(run);
-                }
-
-                // STEP 2: Connector-based tracing for remaining elements (not yet assigned a GUID)
+                // Connector-based tracing for all elements
                 foreach (Element elem in allCableTrays)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -246,21 +219,18 @@ namespace CableTrayHandler
 
                     if (cableTrayRun.ElementCount > 0)
                     {
+                        // Write the GUID to each element in the run
+                        foreach (ElementId id in cableTrayRun.ConnectedElementIds)
+                        {
+                            Element element = document.GetElement(id);
+                            element.LookupParameter(RUN_ID_PARAM)?.Set(cableTrayRun.RunId);
+                        }
+
                         cableTrayRuns.Add(cableTrayRun);
                     }
                 }
 
-                // STEP 3: Write the GUID to each element in all runs
-                foreach (var run in cableTrayRuns)
-                {
-                    foreach (ElementId id in run.ConnectedElementIds)
-                    {
-                        Element element = document.GetElement(id);
-                        element.LookupParameter(RUN_ID_PARAM)?.Set(run.RunId);
-                    }
-                }
-
-                // STEP 4: Get properties from first cable tray in each run
+                // Get properties from first cable tray in each run
                 foreach (var run in cableTrayRuns)
                 {
                     var firstCableTray = run.ConnectedElementIds
@@ -307,10 +277,53 @@ namespace CableTrayHandler
                             element.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitCheckbox"])?.AsInteger() == 1);
                 }
 
+                // Create standalone runs for any untraced fittings
+                var allFittings = new FilteredElementCollector(document)
+                    .OfCategory(BuiltInCategory.OST_CableTrayFitting)
+                    .WhereElementIsNotElementType()
+                    .ToElements();
+
+                foreach (Element fitting in allFittings)
+                {
+                    if (!processedElements.Contains(fitting.Id))
+                    {
+                        var standaloneFittingRun = new CableTrayRun();
+                        standaloneFittingRun.ConnectedElementIds.Add(fitting.Id);
+                        processedElements.Add(fitting.Id);
+
+                        // Write the GUID to the fitting
+                        fitting.LookupParameter(RUN_ID_PARAM)?.Set(standaloneFittingRun.RunId);
+
+                        // Set properties for the standalone fitting
+                        if (fitting is FamilyInstance)
+                        {
+                            standaloneFittingRun.CableTraySize = "Unknown";
+                            standaloneFittingRun.DrofusTag = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitTag"])?.AsString() ?? "No tag";
+                            
+                            var idParam = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitDrofusId"]);
+                            if (idParam != null && idParam.StorageType == StorageType.Integer)
+                            {
+                                standaloneFittingRun.DrofusOccId = idParam.AsInteger();
+                            }
+
+                            standaloneFittingRun.AdditionalProp1 = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp1"])?.AsString() ?? "";
+                            standaloneFittingRun.AdditionalProp2 = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp2"])?.AsString() ?? "";
+                            standaloneFittingRun.AdditionalProp3 = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp3"])?.AsString() ?? "";
+                            standaloneFittingRun.AdditionalProp4 = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp4"])?.AsString() ?? "";
+                            standaloneFittingRun.AdditionalProp5 = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp5"])?.AsString() ?? "";
+                            standaloneFittingRun.AdditionalProp6 = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitAdditionalProp6"])?.AsString() ?? "";
+                            
+                            standaloneFittingRun.IsChecked = fitting.LookupParameter(AssistantArgs.UserArgsRevitParameters["RevitCheckbox"])?.AsInteger() == 1;
+                        }
+
+                        cableTrayRuns.Add(standaloneFittingRun);
+                    }
+                }
+
                 trans.Commit();
             }
 
-            // STEP 5: Apply proximity-based merging if enabled
+            // Apply proximity-based merging if enabled
             if (enableProximityMerging)
             {
                 cableTrayRuns = MergeProximityRuns(cableTrayRuns, document, toleranceMm);
@@ -433,8 +446,11 @@ namespace CableTrayHandler
 
                         // Write DrofusTag (as string)
                         var drofusTagElem = element.LookupParameter(drofusTagParam);
-                        if (drofusTagElem != null && run.DrofusTag != null)
-                            drofusTagElem.Set(run.DrofusTag);
+                        if (drofusTagElem != null)
+                        {
+                            if (run.DrofusTag != null)
+                                drofusTagElem.Set(run.DrofusTag);
+                        }
                     }
                 }
 
@@ -524,6 +540,11 @@ namespace CableTrayHandler
             var mergedRunIndices = new HashSet<int>(); // Track which runs have been merged
             var runMerges = new Dictionary<int, int>(); // Maps old run index to new run index
 
+            // Debug logging
+            var debugTargetIds = new HashSet<int> { 5104874, 5104876, 9347651, 9347661, 9347671 };
+            var logLines = new List<string> { $"=== Merge pass {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===" };
+            string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "CableTrayMergeLog.txt");
+
             // For each pair of runs, check if they should be merged
             for (int i = 0; i < runs.Count; i++)
             {
@@ -539,40 +560,59 @@ namespace CableTrayHandler
                     var run2 = runs[j];
                     var run2Width = run2.CableTraySize;
 
-                    // Only consider merging if same normalized size
-                    if (run1Width != run2Width) continue;
+                    // Only enforce size match when both runs have a defined tray size
+                    bool run1HasSize = !string.IsNullOrEmpty(run1Width) && run1Width != "Unknown";
+                    bool run2HasSize = !string.IsNullOrEmpty(run2Width) && run2Width != "Unknown";
+                    if (run1HasSize && run2HasSize && run1Width != run2Width)
+                    {
+                        continue;
+                    }
 
-                    // Get all cable tray elements (not fittings) for each run
-                    var run1Elements = run1.ConnectedElementIds
-                        .Select(id => document.GetElement(id))
-                        .Where(e => e != null && e is CableTray)
-                        .Cast<CableTray>()
-                        .ToList();
+                    // Collect curves from trays and fittings for each run
+                    var run1Curves = GetRunCurves(run1, document);
+                    var run2Curves = GetRunCurves(run2, document);
 
-                    var run2Elements = run2.ConnectedElementIds
-                        .Select(id => document.GetElement(id))
-                        .Where(e => e != null && e is CableTray)
-                        .Cast<CableTray>()
-                        .ToList();
+                    // If either run has no usable curves, skip
+                    if (!run1Curves.Any() || !run2Curves.Any())
+                    {
+                        continue;
+                    }
 
-                    // Check if any cable tray from run1 is within tolerance of any cable tray from run2
+                    // Check if any curve from run1 is within tolerance of any curve from run2
                     bool shouldMerge = false;
-                    foreach (var tray1 in run1Elements)
+                    double minDistanceFound = double.MaxValue;
+
+                    foreach (var curve1 in run1Curves)
                     {
                         if (shouldMerge) break;
 
-                        var curve1 = (tray1.Location as LocationCurve)?.Curve;
-                        if (curve1 == null) continue;
-
-                        foreach (var tray2 in run2Elements)
+                        foreach (var curve2 in run2Curves)
                         {
-                            var curve2 = (tray2.Location as LocationCurve)?.Curve;
-                            if (curve2 == null) continue;
-
-                            // Calculate minimum distance between the two curves' endpoints
                             double minDistance = CalculateMinDistanceBetweenCurves(curve1, curve2);
+                            if (minDistance < minDistanceFound)
+                                minDistanceFound = minDistance;
 
-                            if (minDistance <= toleranceFeet)
+                            // Get XY and Z distance components separately
+                            var (xyDistance, zDistance) = CalculateXYAndZDistances(curve1, curve2);
+
+                            // Adjust XY distance to account for cable tray widths (edge-to-edge instead of centerline-to-centerline)
+                            double adjustedXyDistance = xyDistance;
+                            if (run1HasSize && run2HasSize)
+                            {
+                                // Parse widths from size strings (e.g., "600" -> 600mm)
+                                if (double.TryParse(run1Width, out double width1Mm) && double.TryParse(run2Width, out double width2Mm))
+                                {
+                                    // Convert widths to feet and subtract half-widths from XY distance only
+                                    double combinedHalfWidthsFeet = (width1Mm / 2 + width2Mm / 2) / 304.8;
+                                    adjustedXyDistance = xyDistance - combinedHalfWidthsFeet;
+                                }
+                            }
+
+                            // Merge only if:
+                            // 1. XY distance (after width adjustment) is within tolerance
+                            // 2. Z distance is very small (e.g., <= 50mm = ~0.164 feet) to avoid merging vertically stacked trays
+                            double maxZDifference = 50.0 / 304.8; // 50mm in feet
+                            if (adjustedXyDistance <= toleranceFeet && zDistance <= maxZDifference)
                             {
                                 shouldMerge = true;
                                 break;
@@ -580,10 +620,32 @@ namespace CableTrayHandler
                         }
                     }
 
+                    // Debug logging for target elements
+                    bool involvesTargets = run1.ConnectedElementIds.Any(id => debugTargetIds.Contains(id.IntegerValue)) ||
+                                           run2.ConnectedElementIds.Any(id => debugTargetIds.Contains(id.IntegerValue));
+
+                    if (involvesTargets)
+                    {
+                        var run1Ids = string.Join(", ", run1.ConnectedElementIds.Select(id => id.IntegerValue));
+                        var run2Ids = string.Join(", ", run2.ConnectedElementIds.Select(id => id.IntegerValue));
+                        logLines.Add($"Pair: run1 IDs [{run1Ids}] vs run2 IDs [{run2Ids}]");
+                        logLines.Add($"Raw centerline distance: {minDistanceFound:0.######} ft ({minDistanceFound * 304.8:0.###} mm)");
+                        
+                        if (run1HasSize && run2HasSize && double.TryParse(run1Width, out double width1) && double.TryParse(run2Width, out double width2))
+                        {
+                            double combinedHalfWidthsMm = width1 / 2 + width2 / 2;
+                            double adjustedDistanceFeet = minDistanceFound - (combinedHalfWidthsMm / 304.8);
+                            logLines.Add($"Width adjustment: {width1}/2 + {width2}/2 = {combinedHalfWidthsMm} mm");
+                            logLines.Add($"Adjusted distance: {adjustedDistanceFeet:0.######} ft ({adjustedDistanceFeet * 304.8:0.###} mm)");
+                        }
+                        
+                        logLines.Add($"Result: {(shouldMerge ? "MERGED" : "NOT MERGED")}");
+                        logLines.Add($"---");
+                    }
+
                     // If runs should be merged, combine run2 into run1
                     if (shouldMerge)
                     {
-                        // Add all elements from run2 to run1
                         foreach (var elemId in run2.ConnectedElementIds)
                         {
                             run1.AddElement(document.GetElement(elemId));
@@ -605,7 +667,59 @@ namespace CableTrayHandler
                 }
             }
 
+            // Write debug log
+            if (logLines.Count > 1)
+            {
+                try
+                {
+                    File.AppendAllLines(logPath, logLines);
+                }
+                catch
+                {
+                    // Swallow logging errors
+                }
+            }
+
             return result;
+        }
+
+        // Build a list of representative curves for trays and fittings in a run
+        private static List<Curve> GetRunCurves(CableTrayRun run, Document document)
+        {
+            var curves = new List<Curve>();
+
+            foreach (var elemId in run.ConnectedElementIds)
+            {
+                var element = document.GetElement(elemId);
+                if (element == null) continue;
+
+                if (element is CableTray tray)
+                {
+                    var locCurve = (tray.Location as LocationCurve)?.Curve;
+                    if (locCurve != null)
+                        curves.Add(locCurve);
+                }
+                else if (element is FamilyInstance fi && fi.Category.Id.Value == (int)BuiltInCategory.OST_CableTrayFitting)
+                {
+                    // Try to build a curve between two connectors as a proxy for the fitting
+                    var connectors = fi.MEPModel?.ConnectorManager?.Connectors;
+                    if (connectors != null)
+                    {
+                        var refs = connectors.Cast<Connector>().ToList();
+                        if (refs.Count >= 2)
+                        {
+                            var p1 = refs[0].Origin;
+                            var p2 = refs[1].Origin;
+                            if (!p1.IsAlmostEqualTo(p2))
+                            {
+                                curves.Add(Line.CreateBound(p1, p2));
+                            }
+                        }
+                    }
+                }
+            }
+
+            return curves;
         }
 
         private static double CalculateMinDistanceBetweenCurves(Curve curve1, Curve curve2)
@@ -636,6 +750,88 @@ namespace CableTrayHandler
 
             // Return the minimum of all distances
             return new[] { d1, d2, d3, d4, d5, d6, d7, d8 }.Min();
+        }
+
+        private static (double xyDistance, double zDistance) CalculateXYAndZDistances(Curve curve1, Curve curve2)
+        {
+            // Get all endpoints
+            var p1Start = curve1.GetEndPoint(0);
+            var p1End = curve1.GetEndPoint(1);
+            var p2Start = curve2.GetEndPoint(0);
+            var p2End = curve2.GetEndPoint(1);
+
+            // Find minimum XY distance (ignoring Z) and corresponding Z difference
+            double minXyDistance = double.MaxValue;
+            double zDistanceAtMinXy = 0;
+
+            var points1 = new[] { p1Start, p1End };
+            var points2 = new[] { p2Start, p2End };
+
+            foreach (var p1 in points1)
+            {
+                foreach (var p2 in points2)
+                {
+                    // XY distance
+                    double xyDist = Math.Sqrt((p1.X - p2.X) * (p1.X - p2.X) + (p1.Y - p2.Y) * (p1.Y - p2.Y));
+                    
+                    if (xyDist < minXyDistance)
+                    {
+                        minXyDistance = xyDist;
+                        zDistanceAtMinXy = Math.Abs(p1.Z - p2.Z);
+                    }
+                }
+            }
+
+            // Also check projection distances (XY only)
+            IntersectionResult result1 = curve2.Project(p1Start);
+            if (result1 != null)
+            {
+                double xyDist = result1.Distance;
+                XYZ projPoint = result1.XYZPoint;
+                if (xyDist < minXyDistance)
+                {
+                    minXyDistance = xyDist;
+                    zDistanceAtMinXy = Math.Abs(p1Start.Z - projPoint.Z);
+                }
+            }
+
+            IntersectionResult result2 = curve2.Project(p1End);
+            if (result2 != null)
+            {
+                double xyDist = result2.Distance;
+                XYZ projPoint = result2.XYZPoint;
+                if (xyDist < minXyDistance)
+                {
+                    minXyDistance = xyDist;
+                    zDistanceAtMinXy = Math.Abs(p1End.Z - projPoint.Z);
+                }
+            }
+
+            IntersectionResult result3 = curve1.Project(p2Start);
+            if (result3 != null)
+            {
+                double xyDist = result3.Distance;
+                XYZ projPoint = result3.XYZPoint;
+                if (xyDist < minXyDistance)
+                {
+                    minXyDistance = xyDist;
+                    zDistanceAtMinXy = Math.Abs(projPoint.Z - p2Start.Z);
+                }
+            }
+
+            IntersectionResult result4 = curve1.Project(p2End);
+            if (result4 != null)
+            {
+                double xyDist = result4.Distance;
+                XYZ projPoint = result4.XYZPoint;
+                if (xyDist < minXyDistance)
+                {
+                    minXyDistance = xyDist;
+                    zDistanceAtMinXy = Math.Abs(projPoint.Z - p2End.Z);
+                }
+            }
+
+            return (minXyDistance, zDistanceAtMinXy);
         }
 
         private static string GetNormalizedCableTraySize(CableTray cableTray)
