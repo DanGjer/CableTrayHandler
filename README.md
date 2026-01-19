@@ -225,15 +225,14 @@ The Cable Tray Handler extension automates the following workflow:
 
 - [dRofus Documentation](https://www.drofus.com/resources/)
 - [Revit MEP Cable Tray Best Practices](https://help.autodesk.com/view/RVT/)
-- [Project Repository](https://cowi-tools@dev.azure.com/cowi-tools/COWI-Tools%20Macros/_git/CableTrayHandler)
+- [Project Repository](https://github.com/DanGjer/CableTrayHandler)
 - Related Extensions: ConduitHandler (similar workflow for electrical conduits)
 
 ## Support
 
 For assistance or to report issues:
 - Contact: DBGJ (dbgj@cowi.com)
-- Project Repository: https://cowi-tools@dev.azure.com/cowi-tools/COWI-Tools%20Macros/_git/CableTrayHandler
-- Company Support: COWI Technical Support
+- Project Repository: https://github.com/DanGjer/CableTrayHandler
 
 ## Version History
 
